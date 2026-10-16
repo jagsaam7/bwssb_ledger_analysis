@@ -1,0 +1,811 @@
+<title>BWSSB Dues Analysis</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout concept: a ledger-audit workbench. Verdict first, then evidence charts in the order the story happens, then the raw ledger. */
+:root{
+  --bg:#f2f4f6; --surface:#ffffff; --surface2:#f7f8fa; --ink:#14181d; --ink2:#4a5360; --ink3:#76818e;
+  --line:#dde2e8; --grid:#e8ecf0;
+  --blue:#2a78d6; --orange:#eb6834; --aqua:#1baf7a; --yellow:#eda100; --mag:#e87ba4; --green:#008300; --red:#d03b3b;
+  --blue-soft:#e4effb; --orange-soft:#fdece5;
+  --pos:#2a78d6; --neg:#eb6834;
+  --font:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0f1317; --surface:#171c21; --surface2:#1c2227; --ink:#eceff3; --ink2:#b4bcc7; --ink3:#8590a0;
+  --line:#2a3139; --grid:#232a31;
+  --blue:#3987e5; --orange:#d95926; --aqua:#199e70; --yellow:#c98500; --mag:#d55181; --green:#2da02d; --red:#e66767;
+  --blue-soft:#17283d; --orange-soft:#3a2118; --pos:#3987e5; --neg:#d95926; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1317; --surface:#171c21; --surface2:#1c2227; --ink:#eceff3; --ink2:#b4bcc7; --ink3:#8590a0;
+  --line:#2a3139; --grid:#232a31;
+  --blue:#3987e5; --orange:#d95926; --aqua:#199e70; --yellow:#c98500; --mag:#d55181; --green:#2da02d; --red:#e66767;
+  --blue-soft:#17283d; --orange-soft:#3a2118; --pos:#3987e5; --neg:#d95926; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:1180px;margin:0 auto}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600;letter-spacing:-.01em}
+p{margin:0}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--mono)}
+
+/* header */
+header.top{padding-block:28px 18px;display:grid;gap:14px}
+.eyebrow{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);font-weight:500}
+h1{font-size:clamp(24px,3.4vw,34px);line-height:1.15}
+.sub{color:var(--ink2);max-width:70ch}
+.meta{display:flex;flex-wrap:wrap;gap:6px 8px}
+.chip{font-size:12px;color:var(--ink2);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px 10px;white-space:nowrap}
+.chip b{font-weight:500;color:var(--ink)}
+
+/* verdict */
+.verdict{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:clamp(18px,3vw,30px);display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:clamp(20px,3vw,40px)}
+@media (max-width:860px){.verdict{grid-template-columns:minmax(0,1fr)}}
+.hero-l{font-size:13px;color:var(--ink2);margin-bottom:4px}
+.hero{font-size:clamp(44px,7vw,64px);font-weight:600;line-height:1;letter-spacing:-.03em}
+.hero small{font-size:.45em;font-weight:500;color:var(--ink2);letter-spacing:0;margin-left:6px}
+.split{margin-top:18px;display:flex;height:14px;gap:2px}
+.split i{display:block;height:100%}
+.split .p{background:var(--blue);border-radius:3px 0 0 3px}.split .n{background:var(--orange);border-radius:0 3px 3px 0}
+.split-l{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:13px;color:var(--ink2);flex-wrap:wrap}
+.dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.answer h2{font-size:18px;margin-bottom:8px}
+.answer p+p{margin-top:10px}
+.answer p{color:var(--ink2)}
+.answer strong{color:var(--ink);font-weight:600}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px;margin-top:14px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.tile .l{font-size:12.5px;color:var(--ink2)}
+.tile .v{font-size:26px;font-weight:600;letter-spacing:-.02em;margin-top:2px;line-height:1.2}
+.tile .d{font-size:12.5px;color:var(--ink3);margin-top:2px}
+
+/* sections */
+section{margin-top:36px}
+.sec-h{display:grid;gap:4px;margin-bottom:14px}
+.sec-h h2{font-size:20px}
+.sec-h p{color:var(--ink2);max-width:78ch}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:clamp(14px,2.2vw,22px);min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.card h3{font-size:15px;margin-bottom:2px}
+.card .cap{font-size:13px;color:var(--ink2);margin-bottom:10px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:12.5px;color:var(--ink2);margin:6px 0 4px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:2px;display:inline-block}
+
+/* charts */
+.chart{position:relative;width:100%}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:var(--font);fill:var(--ink3);font-size:11.5px}
+.chart .gl{stroke:var(--grid);stroke-width:1}
+.chart .ax{stroke:var(--line);stroke-width:1}
+.chart .note{fill:var(--ink2);font-size:11.5px}
+.chart .band{fill:var(--ink);opacity:.06}
+.chart .bandlab{fill:var(--ink2);font-weight:500;font-size:11px}
+.hit{fill:transparent}
+.xh{stroke:var(--ink3);stroke-width:1;stroke-dasharray:none;opacity:.7}
+#tip{position:fixed;z-index:50;pointer-events:none;background:var(--ink);color:var(--bg);border-radius:6px;padding:8px 10px;font-size:12.5px;line-height:1.45;max-width:260px;box-shadow:0 4px 18px rgba(0,0,0,.25);opacity:0;transition:opacity .08s}
+#tip b{font-weight:600}
+#tip .r{display:flex;justify-content:space-between;gap:16px}
+#tip .r span:last-child{font-variant-numeric:tabular-nums}
+#tip .sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px}
+
+/* waterfall + hbars */
+.wf{display:grid;gap:6px}
+.wf-row{display:grid;grid-template-columns:minmax(120px,190px) minmax(0,1fr) 84px;align-items:center;gap:10px;font-size:13px}
+@media (max-width:560px){.wf-row{grid-template-columns:96px minmax(0,1fr) 70px;font-size:12px}}
+.wf-row .name{color:var(--ink2)}
+.wf-track{position:relative;height:20px;background:transparent}
+.wf-bar{position:absolute;top:0;height:100%;border-radius:3px}
+.wf-row .val{text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
+.wf-row.total .name,.wf-row.total .val{font-weight:600;color:var(--ink)}
+.wf-row.sep{border-top:1px solid var(--line);padding-top:8px;margin-top:2px}
+.hb{display:grid;gap:7px}
+.hb-row{display:grid;grid-template-columns:44px minmax(0,1fr) 76px;gap:10px;align-items:center;font-size:12.5px}
+.hb-row .y{color:var(--ink2)}
+.hb-stack{display:flex;gap:2px;height:18px;min-width:0}
+.hb-stack i{display:block;height:100%;min-width:0}
+.hb-row .t{text-align:right;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* phases */
+.phases{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+@media (max-width:1000px){.phases{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:560px){.phases{grid-template-columns:minmax(0,1fr)}}
+.ph{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:grid;gap:6px;align-content:start}
+.ph .n{font-size:12px;font-weight:600;color:var(--ink2);display:flex;gap:8px;align-items:center}
+.ph .n b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ink);color:var(--bg);font-size:11px}
+.ph h3{font-size:15px}
+.ph .when{font-size:12px;color:var(--ink3)}
+.ph p{font-size:13px;color:var(--ink2)}
+.ph .bal{font-size:13px;color:var(--ink);font-weight:500;font-variant-numeric:tabular-nums}
+
+/* factors */
+.factors{display:grid;gap:12px}
+.factor{display:grid;grid-template-columns:64px minmax(0,1fr) minmax(130px,200px);gap:16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;align-items:start}
+@media (max-width:700px){.factor{grid-template-columns:minmax(0,1fr)}}
+.factor .rk{font-size:30px;font-weight:600;color:var(--ink3);line-height:1}
+.factor h3{font-size:16px;margin-bottom:4px}
+.factor p{color:var(--ink2);font-size:14px}
+.factor p+p{margin-top:6px}
+.factor .amt{font-size:22px;font-weight:600;letter-spacing:-.02em;text-align:right;line-height:1.2}
+.factor .amt small{display:block;font-size:12px;font-weight:400;color:var(--ink3);letter-spacing:0;margin-top:2px}
+@media (max-width:700px){.factor .amt{text-align:left}}
+
+/* calculator */
+.calc{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:20px}
+@media (max-width:900px){.calc{grid-template-columns:minmax(0,1fr)}}
+.fld{display:grid;gap:4px;margin-bottom:12px}
+.fld label{font-size:12.5px;color:var(--ink2)}
+.fld input{font:inherit;font-variant-numeric:tabular-nums;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+.fld input:focus-visible,button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+button,select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer}
+button:hover{border-color:var(--ink3)}
+button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.out{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.out div{background:var(--surface2);border-radius:8px;padding:10px 12px}
+.out .l{font-size:12px;color:var(--ink2)}
+.out .v{font-size:19px;font-weight:600;letter-spacing:-.01em}
+.warn{font-size:12.5px;color:var(--ink3);margin-top:10px}
+
+/* table */
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;align-items:center}
+.tools input[type=search]{font:inherit;font-size:13px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:6px 10px;min-width:160px}
+.tscroll{background:var(--surface);overflow:auto;max-height:560px;border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--grid)}
+th{position:sticky;top:0;background:var(--surface2);color:var(--ink2);font-weight:500;z-index:1;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
+th:first-child{background:var(--surface2);z-index:2}
+td{font-family:var(--mono);font-size:12px}
+td:first-child{font-family:var(--font);font-size:12.5px}
+tr.zero td{background:var(--orange-soft)}
+tr.zero td:first-child{background:var(--orange-soft)}
+td.neg{color:var(--orange)}
+.pill{font-size:11px;color:var(--ink2);border:1px solid var(--line);border-radius:999px;padding:0 6px;margin-left:6px}
+
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 18px}
+summary{cursor:pointer;font-weight:600;font-size:15px}
+details ul{margin:10px 0 0;padding-left:18px;color:var(--ink2);font-size:13.5px}
+details li+li{margin-top:6px}
+.todo{display:grid;gap:10px;counter-reset:t}
+.todo li{list-style:none;counter-increment:t;display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;color:var(--ink2);font-size:14px}
+.todo li::before{content:counter(t);display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);font-size:12px;color:var(--ink);font-weight:600}
+.todo{padding:0;margin:0}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-top:4px;overflow-x:auto}
+.tabs button{border:0;border-bottom:3px solid transparent;border-radius:0;background:transparent;padding:10px 14px;font-size:14px;font-weight:500;color:var(--ink2);white-space:nowrap;margin-bottom:-1px}
+.tabs button:hover{color:var(--ink);border-color:transparent;border-bottom-color:var(--line)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--blue)}
+.dsc{color:var(--ink2);font-size:14px;margin-top:12px;max-width:92ch}
+.dsc b{color:var(--ink);font-weight:600}
+.dsc+.dsc{margin-top:8px}
+.sc{display:grid;gap:12px}
+.sc-row{display:grid;grid-template-columns:minmax(150px,270px) minmax(0,1fr) 110px;gap:14px;align-items:center}
+.sc-row .nm{font-size:13.5px;font-weight:500}
+.sc-row .ds{font-size:12.5px;color:var(--ink3);font-weight:400;margin-top:1px}
+.sc-bar{height:18px;position:relative}
+.sc-bar i{position:absolute;left:0;top:0;height:100%;border-radius:3px}
+.sc-row .vv{text-align:right;font-variant-numeric:tabular-nums;font-size:13.5px;font-weight:500}
+.sc-row .vv small{display:block;color:var(--ink3);font-weight:400;font-size:12px}
+@media (max-width:700px){.sc-row{grid-template-columns:minmax(0,1fr)}.sc-row .vv{text-align:left}}
+.rule{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-bottom:14px}
+@media (max-width:800px){.rule{grid-template-columns:minmax(0,1fr)}}
+.rule div{background:var(--surface2);border-radius:8px;padding:12px 14px;font-size:13.5px;color:var(--ink2)}
+.rule b{display:block;color:var(--ink);font-size:13px;margin-bottom:2px}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+@media (max-width:800px){.trio{grid-template-columns:minmax(0,1fr)}}
+.trio .card h3{font-size:15px}
+.trio .big{font-size:26px;font-weight:600;letter-spacing:-.02em;margin:4px 0}
+.trio p{font-size:13.5px;color:var(--ink2)}
+.tscroll.sm{max-height:none}
+footer{margin-top:36px;font-size:12.5px;color:var(--ink3)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <div class="eyebrow">Bangalore Water Supply and Sewerage Board · Metered ledger</div>
+  <h1>Why the BWSSB bill reached ₹24 lakh</h1>
+  <p class="sub">Analysis of 142 monthly ledger entries, January 2015 to October 2026, for the water connection of AEE BDA EWS (120 flats).</p>
+  <div class="meta" id="meta"></div>
+</header>
+<nav class="tabs" role="tablist" aria-label="Report sections">
+  <button type="button" role="tab" id="t-overview" data-tab="overview" aria-selected="true" aria-controls="tab-overview">Overview</button>
+  <button type="button" role="tab" id="t-interest" data-tab="interest" aria-selected="false" aria-controls="tab-interest" tabindex="-1">Interest analysis</button>
+</nav>
+
+<div id="tab-overview" role="tabpanel" aria-labelledby="t-overview" tabindex="0" style="margin-top:16px">
+<div class="verdict" id="verdict"></div>
+<div class="tiles" id="tiles"></div>
+
+<section>
+  <div class="sec-h"><h2>The five reasons, ranked by rupees</h2><p>Each figure is computed from the ledger rows. Reasons 1 and 4 are two views of one mechanism: a small unpaid base that keeps earning interest.</p></div>
+  <div class="factors" id="factors"></div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>How the balance grew</h2><p>The balance is split into charges that were billed and never paid (blue) and interest added by BWSSB (orange). Numbers on the chart mark the five periods described below.</p></div>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--blue)"></i>Unpaid billed charges</span><span><i style="background:var(--orange)"></i>Accumulated interest</span></div>
+    <div class="chart" id="c-balance"></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Five periods</h2><p>The pattern changes four times. Only the second period is a large unpaid gap; everything after it is the cost of carrying that gap.</p></div>
+  <div class="phases" id="phases"></div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Where the ₹24.12 lakh came from</h2><p>Every rupee billed or added since January 2015, less every rupee collected. The ledger's closing balance is the last bar.</p></div>
+  <div class="card"><div class="wf" id="waterfall"></div></div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Payments against the monthly bill</h2><p>Blue bars are months where more was paid than the month's current charges. Orange bars are months paid short. The shaded block is the 2016 to 2018 payment break.</p></div>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--pos)"></i>Paid more than billed</span><span><i style="background:var(--neg)"></i>Paid less than billed</span></div>
+    <div class="chart" id="c-gap"></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Interest has overtaken the service bill</h2><p>Interest added each month versus the month's current charges. From late 2024 interest is about as large as, or larger than, the bill for service itself.</p></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Monthly interest vs monthly current charges</h3><div class="cap">From August 2018, when payments settled at the current bill.</div>
+      <div class="legend"><span><i style="background:var(--orange)"></i>Interest added</span><span><i style="background:var(--blue)"></i>Current charges billed</span></div>
+      <div class="chart" id="c-int"></div>
+    </div>
+    <div class="card">
+      <h3>What was added each year</h3>
+      <div class="cap">Annual amount billed for service plus interest added. 2026 covers January to October.</div>
+      <div class="legend"><span><i style="background:var(--blue)"></i>Sanitary, borewell, meter</span><span><i style="background:var(--aqua)"></i>Water usage</span><span><i style="background:var(--yellow)"></i>Other charge</span><span><i style="background:var(--orange)"></i>Interest</span></div>
+      <div class="hb" id="annual"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Water use is a small part of the bill</h2><p>Sanitary, borewell and meter charges are fixed. Usage charges are ₹22 per kilolitre until late 2025. Meter readings are irregular, with long quiet stretches and sudden catch-ups.</p></div>
+  <div class="card">
+    <h3>Metered consumption per month (kilolitres)</h3>
+    <div class="chart" id="c-cons"></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>What happens if payments continue as now</h2><p>A planning tool using the interest rate seen in the ledger. Change the payment and see the balance five or ten years out.</p></div>
+  <div class="card calc">
+    <div>
+      <div class="presets" id="presets"></div>
+      <div class="fld"><label for="in-lump">One-time payment now (₹)</label><input id="in-lump" type="number" min="0" step="10000" value="0" inputmode="numeric"></div>
+      <div class="fld"><label for="in-pay">Monthly payment (₹)</label><input id="in-pay" type="number" min="0" step="1000" value="35290" inputmode="numeric"></div>
+      <div class="fld"><label for="in-cd">Current monthly charges (₹)</label><input id="in-cd" type="number" min="0" step="100" value="35290" inputmode="numeric"></div>
+      <div class="fld"><label for="in-rate">Interest per month (%)</label><input id="in-rate" type="number" min="0" max="5" step="0.001" value="1.667" inputmode="decimal"></div>
+      <div class="fld"><label for="in-n">Months to project</label><input id="in-n" type="number" min="6" max="180" step="6" value="60" inputmode="numeric"></div>
+    </div>
+    <div>
+      <div class="out" id="calc-out"></div>
+      <div class="legend"><span><i style="background:var(--orange)"></i>Pay only the current bill</span><span><i style="background:var(--blue)"></i>Your scenario</span></div>
+      <div class="chart" id="c-proj"></div>
+      <p class="warn" id="calc-warn"></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>What to ask BWSSB for</h2></div>
+  <ol class="todo" id="todo"></ol>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Full ledger</h2><p>All 142 rows as transcribed. Orange rows are months with no payment. Amounts in rupees.</p></div>
+  <div class="tools">
+    <label for="f-sel" style="font-size:13px;color:var(--ink2)">Period</label>
+    <select id="f-sel"></select>
+    <input id="f-q" type="search" placeholder="Search month, e.g. Mar 2018" aria-label="Search month">
+    <button id="f-zero" type="button" aria-pressed="false">Only months with no payment</button>
+    <button id="f-copy" type="button">Copy as CSV</button>
+    <span id="f-count" style="font-size:12.5px;color:var(--ink3)"></span>
+  </div>
+  <div class="tscroll"><table id="tbl"><thead></thead><tbody></tbody></table></div>
+</section>
+
+<section>
+  <details>
+    <summary>How this was built, and what to treat with care</summary>
+    <ul id="notes"></ul>
+  </details>
+</section>
+</div>
+
+<div id="tab-interest" role="tabpanel" aria-labelledby="t-interest" tabindex="0" hidden style="margin-top:16px">
+<section style="margin-top:8px">
+  <div class="sec-h"><h2>How the interest grew</h2><p id="i-intro"></p></div>
+  <div class="tiles" id="i-tiles"></div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Where the balance comes from</h2><p>The balance is split into three layers: the charges that were billed and never paid, the interest on those charges, and the interest charged on earlier interest.</p></div>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--blue)"></i>Unpaid billed charges</span><span><i style="background:var(--orange)"></i>Interest on unpaid charges</span><span><i style="background:var(--mag)"></i>Interest on earlier interest</span></div>
+    <div class="chart" id="c-snow"></div>
+    <p class="dsc" id="i-snow-d"></p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Interest added each year</h2><p>Each year adds more than the one before, because the amount earning interest includes all earlier interest.</p></div>
+  <div class="card">
+    <div class="legend"><span><i style="background:var(--orange)"></i>Interest on unpaid charges</span><span><i style="background:var(--mag)"></i>Interest on earlier interest</span></div>
+    <div class="hb" id="i-years"></div>
+    <p class="dsc" id="i-years-d"></p>
+    <div class="tscroll sm" style="margin-top:14px"><table id="i-ytbl"></table></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>How the ledger calculates interest</h2><p>The rule can be read straight off the ledger rows.</p></div>
+  <div class="card">
+    <div class="rule">
+      <div><b>1. Charge</b>Each month the interest is one sixtieth (1.667%) of the Bill Arrear.</div>
+      <div><b>2. Add</b>The closing balance includes that month's interest.</div>
+      <div><b>3. Carry</b>Next month's Bill Arrear equals this month's closing balance, so the interest now earns interest.</div>
+    </div>
+    <div class="tscroll sm"><table id="i-ex"></table></div>
+    <p class="dsc" id="i-ex-d"></p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>What moved the balance most</h2><p>Each bar is what the October 2026 balance would be if one thing had been different and everything else had stayed as it was.</p></div>
+  <div class="card">
+    <div class="sc" id="i-sc"></div>
+    <p class="dsc" id="i-sc-d"></p>
+    <p class="warn" id="i-sc-w"></p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Rate and time</h2><p>The two levers that decide how fast a small unpaid base grows.</p></div>
+  <div class="grid2">
+    <div class="card">
+      <h3>Today's balance at different monthly interest rates</h3>
+      <div class="cap">Same bills and payments as the ledger, only the rate changes.</div>
+      <div class="chart" id="c-rate"></div>
+      <p class="dsc" id="i-rate-d"></p>
+    </div>
+    <div class="card">
+      <h3>The price of waiting</h3>
+      <div class="cap">Amount on the bill (total demand) in August of each year, and in October 2026.</div>
+      <div class="hb" id="i-wait"></div>
+      <p class="dsc" id="i-wait-d"></p>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>Three things set the size of the balance</h2></div>
+  <div class="trio" id="i-trio"></div>
+</section>
+</div>
+<footer>Source: 11 photographed pages of the BWSSB Metered Ledger Report. Figures in Indian rupees; L = lakh (1,00,000).</footer>
+</div>
+<div id="tip" role="tooltip"></div>
+
+<script>
+const RAW = [["2015-01",329,19636,19636,0,7238,12000,12000,1000,0,32238,0,51874,41000,10874],["2015-02",63,11739,11739,0,1386,12000,12000,1000,0,26386,0,38125,28125,10000],["2015-03",158,10635,10635,0,3476,12000,12000,1000,0,28476,0,39111,36000,3111],["2015-04",302,39763,39111,652,6644,12000,12000,1000,0,31644,0,71407,32296,39111],["2015-05",353,3763,3701,62,7766,12000,12000,1000,0,32766,0,36529,36529,0],["2015-06",237,608,608,0,5214,12000,12000,1000,0,30214,0,30822,30822,0],["2015-07",438,0,0,0,9636,12000,12000,1000,0,34636,0,34636,34636,0],["2015-08",575,0,0,0,12650,12000,12000,1000,0,37650,0,37650,37650,0],["2015-09",540,0,0,0,11880,12000,12000,1000,0,36880,0,36880,36880,0],["2015-10",792,0,0,0,17424,12000,12000,1000,0,42424,0,42424,36000,6424],["2015-11",621,7131,7131,0,13662,12000,12000,1000,0,38662,0,45793,45793,0],["2015-12",384,763,763,0,8448,12000,12000,1000,0,33448,0,34211,34200,11],["2016-01",415,581,581,0,9130,12000,12000,1000,0,34130,0,34711,34711,0],["2016-02",289,579,579,0,6358,12000,12000,1000,0,31358,0,31937,32000,-63],["2016-03",485,469,469,0,10670,12000,12000,1000,0,35670,0,36139,36140,-1],["2016-04",461,601,601,0,10142,12000,12000,1000,0,35142,0,35743,35750,-7],["2016-05",242,589,589,0,5324,12000,12000,1000,0,30324,0,30913,30920,-7],["2016-06",84,508,508,0,1848,12000,12000,1000,0,26848,0,27356,27356,0],["2016-07",484,456,456,0,10648,12000,12000,1000,0,35648,0,36104,36105,-1],["2016-08",476,601,601,0,10472,12000,12000,1000,8868,44340,0,44941,0,44941],["2016-09",399,45690,44941,749,8778,12000,12000,1000,8445,42223,0,87913,70600,17313],["2016-10",384,89366,87164,2202,8448,12000,12000,1000,10224,43672,0,127926,35650,92276],["2016-11",277,58281,57326,955,6094,12000,12000,1000,7524,38618,0,96899,33000,63899],["2016-12",393,28720,28249,471,8646,12000,12000,1000,16323,49969,0,78689,34117,44572],["2017-01",603,45876,45876,0,13266,12000,12000,1000,27950,66216,0,112092,38266,73826],["2017-02",542,75694,75694,0,11924,12000,12000,1000,0,36924,0,112618,37000,75618],["2017-03",284,77495,77495,0,6248,12000,12000,1000,33086,64334,0,141829,31248,110581],["2017-04",872,112945,112945,0,19184,12000,12000,1000,19777,63961,0,176906,39000,137906],["2017-05",694,140854,140854,0,15268,12000,12000,1000,9817,50085,0,190939,40300,150639],["2017-06",565,122562,122562,0,12430,12000,12000,1000,9107,46537,31259,169099,37500,131599],["2017-07",451,134417,134417,0,9922,12000,12000,1000,8481,43403,0,177820,0,177820],["2017-08",477,180784,177820,2964,10494,12000,12000,1000,17247,52741,0,233525,0,233525],["2017-09",475,237368,230561,6807,10450,12000,12000,1000,17225,52675,0,290043,0,290043],["2017-10",370,294764,283236,11528,8140,12000,12000,1000,16070,49210,0,343974,0,343974],["2017-11",175,349515,332446,17069,3850,12000,12000,1000,73475,102325,0,451840,0,451840],["2017-12",200,459086,434771,24315,4400,12000,12000,1000,7100,36500,0,495586,0,495586],["2018-01",446,503441,471271,32170,9812,12000,12000,1000,8453,43265,0,546706,0,546706],["2018-02",479,555282,514536,40746,10538,12000,12000,1000,17269,52807,0,608089,270200,337889],["2018-03",133,379612,373389,6223,2926,12000,12000,1000,13463,41389,0,421001,28000,393001],["2018-04",433,363459,357501,5958,9526,12000,12000,1000,16763,51289,0,414748,35000,379748],["2018-05",739,386561,386561,0,16258,12000,12000,1000,20129,61387,0,447948,41260,406688],["2018-06",666,414154,414154,0,14652,12000,12000,1000,19326,58978,0,473132,40000,433132],["2018-07",315,440351,433132,7219,6930,12000,12000,1000,15465,47395,0,487746,31930,455816],["2018-08",381,463825,463825,0,8382,12000,12000,1000,0,33382,0,497207,33382,463825],["2018-09",299,471555,463825,7730,6578,12000,12000,1000,0,31578,0,503133,31578,471555],["2018-10",147,479414,471555,7859,3234,12000,12000,1000,0,28234,0,507648,27800,479848],["2018-11",64,487845,479848,7997,1408,12000,12000,1000,0,26408,0,514253,25000,489253],["2018-12",87,497407,489253,8154,1914,12000,12000,1000,0,26914,0,524321,26920,497401],["2019-01",414,505691,497401,8290,9108,12000,12000,1000,0,34108,0,539799,34050,505749],["2019-02",852,514178,505749,8429,18744,12000,12000,1000,0,43744,0,557922,43744,514178],["2019-03",809,522748,514178,8570,17798,12000,12000,1000,0,42798,0,565546,42800,522746],["2019-04",1054,531458,522746,8712,23188,12000,12000,1000,0,48188,0,579646,40050,539596],["2019-05",1161,548589,539596,8993,25542,12000,12000,1000,0,50542,0,599131,50550,548581],["2019-06",483,557724,548581,9143,10626,12000,12000,1000,0,35626,0,593350,35630,557720],["2019-07",89,567015,557720,9295,1958,12000,12000,1000,0,26958,0,593973,26960,567013],["2019-08",57,576463,567013,9450,1254,12000,12000,1000,0,26254,0,602717,26250,576467],["2019-09",55,586075,576467,9608,1210,12000,12000,1000,0,26210,0,612285,26200,586085],["2019-10",87,595853,586085,9768,1914,12000,12000,1000,0,26914,0,622767,27000,595767],["2019-11",41,605696,595767,9929,902,12000,12000,1000,0,25902,0,631598,25902,605696],["2019-12",26,615791,605696,10095,572,12000,12000,1000,0,25572,0,641363,25570,615793],["2020-01",289,626056,615793,10263,6358,12000,12000,1000,0,31358,0,657414,31360,626054],["2020-02",154,636488,626054,10434,3388,12000,12000,1000,0,28388,0,664876,28388,636488],["2020-03",143,647096,636488,10608,3146,12000,12000,1000,0,28146,0,675242,28150,647092],["2020-04",153,657877,647092,10785,3366,12000,12000,1000,0,28366,0,686243,28150,658093],["2020-05",134,669351,669351,0,2948,12000,12000,1000,0,27948,0,697299,25000,672299],["2020-06",134,683504,672299,11205,2948,12000,12000,1000,-472,27476,0,711452,27950,683502],["2020-07",165,695173,695173,0,3630,12000,12000,1000,0,28630,0,723803,28650,695153],["2020-08",17,706739,695153,11586,374,12000,12000,1000,0,25374,0,732113,25400,706713],["2020-09",19,718492,706713,11779,418,12000,12000,1000,0,25418,0,743910,25420,718490],["2020-10",87,730465,718490,11975,1914,12000,12000,1000,0,26914,0,757379,27000,730379],["2020-11",85,742552,730379,12173,1870,12000,12000,1000,0,26870,0,769422,26900,742522],["2020-12",23,754897,742522,12375,506,12000,12000,1000,0,25506,0,780403,25520,754883],["2021-01",62,767683,767683,0,1364,12000,12000,1000,0,26364,0,794047,26370,767677],["2021-02",85,780472,767677,12795,1870,12000,12000,1000,0,26870,0,807342,26870,780472],["2021-03",105,793480,780472,13008,2310,12000,12000,1000,0,27310,0,820790,27300,793490],["2021-04",148,806715,793490,13225,3256,12000,12000,1000,0,28256,0,834971,28300,806671],["2021-05",186,820116,806671,13445,4092,12000,12000,1000,0,29092,0,849208,27600,821608],["2021-06",111,835537,835537,0,2442,12000,12000,1000,0,27442,0,862979,27450,835529],["2021-07",127,849454,835529,13925,2794,12000,12000,1000,0,27794,0,877248,27800,849448],["2021-08",99,863605,849448,14157,2178,12000,12000,1000,0,27178,0,890783,27170,863613],["2021-09",134,878223,878223,0,2948,12000,12000,1000,0,27948,0,906171,27950,878221],["2021-10",23,892858,878221,14637,506,12000,12000,1000,0,25506,0,918364,25510,892854],["2021-11",98,907916,907916,0,2156,12000,12000,1000,0,27156,0,935072,27160,907912],["2021-12",18,923497,923497,0,396,12000,12000,1000,0,25396,0,948893,25400,923493],["2022-01",20,939308,939308,0,440,12000,12000,1000,0,25440,0,964748,25500,939248],["2022-02",230,954902,939248,15654,5060,12000,12000,1000,0,30060,0,984962,30100,954862],["2022-03",212,971017,971017,0,4664,12000,12000,1000,0,29664,0,1000681,29700,970981],["2022-04",644,987164,970981,16183,14168,12000,12000,1000,0,39168,0,1026332,39200,987132],["2022-05",294,1003584,987132,16452,6468,12000,12000,1000,0,31468,0,1035052,31500,1003552],["2022-06",24,1020278,1003552,16726,528,12000,12000,1000,0,25528,0,1045806,25310,1020496],["2022-07",142,1037504,1020496,17008,3124,12000,12000,1000,0,28124,0,1065628,28130,1037498],["2022-08",74,1054790,1037498,17292,1628,12000,12000,1000,0,26628,0,1081418,26650,1054768],["2022-09",84,1072347,1054768,17579,1848,12000,12000,1000,0,26848,0,1099195,26850,1072345],["2022-10",31,1090217,1072345,17872,682,12000,12000,1000,0,25682,0,1115899,25680,1090219],["2022-11",46,1108389,1090219,18170,1012,12000,12000,1000,0,26012,0,1134401,26000,1108401],["2022-12",58,1119175,1108401,10774,1276,12000,12000,1000,0,26276,0,1145451,26300,1119151],["2023-01",38,1137804,1119151,18653,836,12000,12000,1000,0,25836,0,1163640,25840,1137800],["2023-02",121,1149696,1137800,11896,2662,12000,12000,1000,0,27662,0,1177358,27660,1149698],["2023-03",135,1168860,1149698,19162,2970,12000,12000,1000,0,27970,0,1196830,27900,1168930],["2023-04",353,1188412,1168930,19482,7766,12000,12000,1000,0,32766,0,1221178,32770,1188408],["2023-05",131,1208215,1188408,19807,2882,12000,12000,1000,0,27882,0,1236097,27900,1208197],["2023-06",45,1228334,1208197,20137,990,12000,12000,1000,0,25990,0,1254324,26000,1228324],["2023-07",29,1248796,1228324,20472,638,12000,12000,1000,0,25638,0,1274434,25500,1248934],["2023-08",198,1269750,1248934,20816,4356,12000,12000,1000,0,29356,0,1299106,29500,1269606],["2023-09",359,1290766,1269606,21160,7898,12000,12000,1000,0,32898,0,1323664,32900,1290764],["2023-10",418,1312277,1290764,21513,9196,12000,12000,1000,0,34196,0,1346473,34200,1312273],["2023-11",41,1334144,1312273,21871,902,12000,12000,1000,0,25902,0,1360046,25910,1334136],["2023-12",133,1356372,1334136,22236,2926,12000,12000,1000,0,27926,0,1384298,27930,1356368],["2024-01",303,1378974,1356368,22606,6666,12000,12000,1000,0,31666,0,1410640,31700,1378940],["2024-02",478,1401922,1378940,22982,10516,12000,12000,1000,0,35516,0,1437438,35520,1401918],["2024-03",1464,1401918,1401918,0,32208,12000,12000,1000,0,57208,0,1459126,57210,1401916],["2024-04",1792,1426235,1401916,24319,39424,12000,12000,1000,0,64424,0,1490659,64440,1426219],["2024-05",635,1450658,1426219,24439,13970,12000,12000,1000,0,38970,0,1489628,39000,1450628],["2024-06",118,1474805,1450628,24177,2596,12000,12000,1000,0,27596,0,1502401,27600,1474801],["2024-07",798,1499381,1474801,24580,17556,12000,12000,1000,0,42556,0,1541937,0,1541937],["2024-08",41,1567226,1517357,49869,-15752,12000,12000,1000,6000,15248,0,1582474,52000,1530474],["2024-09",6,1556017,1532605,23412,176,12000,12000,1000,0,25176,0,1581193,25700,1555493],["2024-10",45,1581418,1555493,25925,990,12000,12000,1000,0,25990,0,1607408,26000,1581408],["2024-11",5,1607691,1581408,26283,176,12000,12000,1000,0,25176,0,1632867,25200,1607667],["2024-12",16,1634443,1606584,27859,352,12000,12000,1000,0,25352,0,1659795,26400,1633395],["2025-01",10,1660594,1631936,28658,220,12000,12000,1000,0,25220,0,1685814,25200,1660614],["2025-02",5,1688233,1657156,31077,176,12000,12000,1000,0,25176,0,1713409,25200,1688209],["2025-03",97,1716248,1682332,33916,2134,12000,12000,1000,0,27134,0,1743382,27200,1716182],["2025-04",82,1744673,1709466,35207,1804,12000,12000,1000,0,26804,0,1771477,26800,1744677],["2025-05",2,1773615,1736270,37345,3000,15600,15600,1000,0,35200,0,1808815,32200,1776615],["2025-06",12,1806140,1771470,34670,3000,15600,15600,1000,0,35200,0,1841340,35200,1806140],["2025-07",1,1836242,1806140,30102,3000,15600,15600,1000,0,35200,0,1871442,35200,1836242],["2025-08",1,1866846,1836242,30604,3000,15600,15600,1000,0,35200,0,1902046,32200,1869846],["2025-09",22,1901010,1869846,31164,3000,15600,15600,1000,0,35200,0,1936210,0,1936210],["2025-10",27,1967961,1905046,62915,675,15600,15600,1000,0,32875,0,2000836,32200,1968636],["2025-11",19,2000935,1937921,63014,475,15600,15600,1000,0,32675,0,2033610,32200,2001410],["2025-12",10,2034253,1970596,63657,250,15600,15600,1000,0,32450,0,2066703,32500,2034203],["2026-01",5,2067587,2003046,64541,125,15600,15600,1000,0,32325,0,2099912,33200,2066712],["2026-02",4,2100635,2035371,65264,100,15600,15600,1000,0,32300,0,2132935,32200,2100735],["2026-03",356,2135196,2067671,67525,9368,15600,15600,1000,0,41568,0,2176764,41600,2135164],["2026-04",1298,2170318,2109239,61079,45790,22895,15600,1000,0,85285,0,2255603,0,2255603],["2026-05",1135,2292178,2194524,97654,37930,18965,15600,1000,0,73495,0,2365673,30000,2335673],["2026-06",1,2373473,2268019,105454,3090,15600,15600,1000,0,35290,0,2408763,0,2408763],["2026-07",1,2447151,2303309,143842,3090,15600,15600,1000,0,35290,0,2482441,290500,2191941],["2026-08",1,2230918,2191941,38977,3090,15600,15600,1000,0,35290,0,2266208,0,2266208],["2026-09",1,2303329,2227231,76098,3090,15600,15600,1000,0,35290,0,2338619,0,2338619],["2026-10",2,2376328,2262521,113807,3090,15600,15600,1000,0,35290,0,2411618,0,2411618]];
+const COLS=['m','cons','ai','ar','int','w','san','sbw','mt','oth','cd','wo','tot','coll','close'];
+const R=RAW.map(a=>Object.fromEntries(COLS.map((k,i)=>[k,a[i]])));
+const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const lab=m=>MN[+m.slice(5)-1]+' '+m.slice(0,4);
+const OPEN=19636;
+let prev=OPEN,pr=OPEN;
+R.forEach((r,i)=>{r.i=i;r.label=lab(r.m);r.fixed=r.san+r.sbw+r.mt;
+  r.intAdj=(r.close-prev-r.cd+r.coll)+r.wo; prev=r.close; pr+=r.cd-r.coll-r.wo;
+  r.prin=pr; r.cumInt=r.close-pr; r.gap=r.coll-r.cd;});
+const N=R.length, LAST=R[N-1];
+const sum=(a,f)=>a.reduce((s,r)=>s+f(r),0);
+const idx=m=>R.findIndex(r=>r.m===m);
+
+/* formatting */
+const inr=n=>(n<0?'−':'')+'₹'+Math.abs(Math.round(n)).toLocaleString('en-IN');
+const L=(n,d=2)=>Math.abs(n)<500?'₹0':'₹'+(n/1e5).toFixed(d)+' L';
+const Lnum=(n,d=2)=>(n/1e5).toFixed(d);
+const K=n=>'₹'+(n/1000).toFixed(1)+'K';
+const axL=v=>{const a=Math.abs(v);const s=a>=1e5?(a/1e5).toFixed(a%1e5?1:0).replace(/\.0$/,'')+'L':a>=1000?(a/1000).toFixed(0)+'K':String(a);return (v<0?'−':'')+(v===0?'0':s)};
+const axK=v=>v===0?'0':(v/1000).toFixed(0)+'K';
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+/* ---------- derived facts ---------- */
+const T={
+  water:sum(R,r=>r.water??r.w), fixed:sum(R,r=>r.fixed), other:sum(R,r=>r.oth), coll:sum(R,r=>r.coll),
+  interest:sum(R,r=>r.intAdj), wo:sum(R,r=>r.wo), cd:sum(R,r=>r.cd)
+};
+T.water=sum(R,r=>r.w);
+const interestShare=T.interest/LAST.close, principal=LAST.prin;
+const zeroMonths=R.filter(r=>r.coll===0);
+const phasesDef=[
+ {id:1,name:'Paid in full',a:'2015-01',b:'2016-07'},
+ {id:2,name:'The payment break',a:'2016-08',b:'2018-01'},
+ {id:3,name:'Catch-up',a:'2018-02',b:'2018-07'},
+ {id:4,name:'Current bill only',a:'2018-08',b:'2025-04'},
+ {id:5,name:'Higher tariff, missed months',a:'2025-05',b:'2026-10'}];
+phasesDef.forEach(p=>{p.i0=idx(p.a);p.i1=idx(p.b);const s=R.slice(p.i0,p.i1+1);p.n=s.length;
+  p.cd=sum(s,r=>r.cd);p.coll=sum(s,r=>r.coll);p.int=sum(s,r=>r.intAdj);p.oth=sum(s,r=>r.oth);
+  p.zero=s.filter(r=>r.coll===0).length;p.start=p.i0?R[p.i0-1].close:OPEN;p.end=R[p.i1].close;});
+const P=id=>phasesDef[id-1];
+const brk=P(2);
+const peak=R.reduce((m,r)=>r.close>m.close?r:m,R[0]);
+const peakEarly=R.slice(0,idx('2018-08')).reduce((m,r)=>r.close>m.close?r:m,R[0]);
+const cd_now=LAST.cd, intNow=LAST.intAdj;
+const breakEven=LAST.close/60+cd_now;
+const crossIdx=idx('2024-09');
+const intOver=R.slice(crossIdx).filter(r=>r.intAdj>r.cd).length, intOverOf=N-crossIdx;
+const consTot=sum(R,r=>r.cons);
+const cons2025=sum(R.filter(r=>r.m.startsWith('2025')),r=>r.cons);
+const springSpike=R[idx('2026-04')].cons+R[idx('2026-05')].cons;
+const sp24=R[idx('2024-03')].cons+R[idx('2024-04')].cons;
+const cntOther=R.filter(r=>r.oth>0).length;
+const otherWin=sum(R.slice(idx('2016-08'),idx('2018-07')+1),r=>r.oth);
+// back-test of 1/60 per month rule
+let sim=R[idx('2018-07')].close;R.slice(idx('2018-08')).forEach(r=>{sim=sim*(1+1/60)+r.cd-r.coll});
+const backErr=sim/LAST.close-1;
+const ratios=R.filter(r=>r.int&&r.ar&&r.m>='2018-09'&&r.m<='2024-06').map(r=>r.int/r.ar).sort((a,b)=>a-b);
+const medRate=ratios[Math.floor(ratios.length/2)];
+const taxExtra=(15600-12000)*2*(N-idx('2025-05'));
+
+/* ---------- header / verdict / tiles ---------- */
+document.getElementById('meta').innerHTML=[
+ ['Consumer','AEE BDA EWS (120 flats)'],['RR No','NW106872'],['Sub division','WEST12'],['Category','Domestic HR'],
+ ['Borewell','Yes'],['Meter','ITRON 165f034715'],['Sanctioned','01/06/2013'],['Ward','43']
+].map(([k,v])=>`<span class="chip">${k} <b>${v}</b></span>`).join('');
+
+document.getElementById('verdict').innerHTML=`
+ <div>
+  <div class="hero-l">Outstanding on the ${LAST.label} bill</div>
+  <div class="hero num">${inr(LAST.close)}</div>
+  <div class="split" role="img" aria-label="Interest ${Math.round(interestShare*100)} percent, unpaid charges ${Math.round((1-interestShare)*100)} percent">
+    <i class="p" style="width:${(1-interestShare)*100}%"></i><i class="n" style="width:${interestShare*100}%"></i></div>
+  <div class="split-l"><span><span class="dot" style="background:var(--blue)"></span>Unpaid billed charges <b class="num">${L(principal)}</b></span>
+    <span><span class="dot" style="background:var(--orange)"></span>Interest <b class="num">${L(T.interest)}</b> (${Math.round(interestShare*100)}%)</span></div>
+ </div>
+ <div class="answer">
+  <h2>The short answer</h2>
+  <p>The water service did not become expensive. The monthly bill for service was ${inr(R[idx('2015-09')].cd)} in September 2015 and ${inr(cd_now)} in ${LAST.label}. The balance grew because charges left unpaid in 2016 to 2018 have been earning interest at about <strong>1.667% a month</strong> ever since.</p>
+  <p>Over the whole period ${L(T.cd+0)} was billed for service and <strong>${L(T.coll)} was paid (${Math.round(T.coll/T.cd*100)}%)</strong>. The ${L(T.cd-T.coll+OPEN-T.wo)} that stayed unpaid has become ${L(LAST.close)}.</p>
+ </div>`;
+
+document.getElementById('tiles').innerHTML=[
+ ['Bill amount, Sep 2015',inr(R[idx('2015-09')].tot),'Total demand, no arrears'],
+ ['Bill amount, '+LAST.label,inr(LAST.tot),`${(LAST.tot/R[idx('2015-09')].tot).toFixed(0)} times larger`],
+ ['Current charges, '+LAST.label,inr(cd_now),`${Math.abs((cd_now/R[idx('2015-09')].cd-1)*100).toFixed(0)}% ${cd_now<R[idx('2015-09')].cd?'lower':'higher'} than Sep 2015`],
+ ['Interest added this month',inr(intNow),'Larger than the current charges'],
+ ['Payment to hold the balance flat',inr(breakEven),'Per month, including the current bill'],
+ ['Months with no payment',`${zeroMonths.length} of ${N}`,`${brk.zero} of them in Aug 2016 to Jan 2018`]
+].map(([l,v,d])=>`<div class="tile"><div class="l">${l}</div><div class="v num">${v}</div><div class="d">${d}</div></div>`).join('');
+
+/* ---------- factors ---------- */
+const jan18=R[idx('2018-01')];
+document.getElementById('factors').innerHTML=[
+ {t:'Interest on old dues, compounding monthly',a:L(T.interest),s:`${Math.round(interestShare*100)}% of the balance`,
+  p:[`From the ledger, interest is charged at one sixtieth of the arrears each month (median ${(medRate*100).toFixed(3)}%), about 20% a year, and the previous month's interest joins the arrears. A model with that single rule reproduces the ledger balance to within ${(Math.abs(backErr)*100).toFixed(1)}% over eight years.`,
+     `From September 2024 the interest added each month is about the size of the whole monthly service bill, and it was higher than the bill in ${intOver} of the ${intOverOf} months since.`]},
+ {t:'The 2016 to 2018 payment break',a:L(brk.cd-brk.coll),s:`billed ${L(brk.cd)}, paid ${L(brk.coll)}`,
+  p:[`${brk.zero} of the 18 months from August 2016 to January 2018 have no payment at all, including seven in a row from July 2017. The balance went from nearly zero to ${L(jan18.close)} in 18 months.`,
+     `This is the seed. Everything in reason 1 is interest on this base.`]},
+ {t:'"Other Charge" with no breakdown',a:L(T.other),s:`${L(otherWin)} between Aug 2016 and Jul 2018`,
+  p:[`The ledger shows an "Other Charge" in ${cntOther} months, mostly ₹7,000 to ₹34,000 and once ₹73,475. It makes up ${Math.round(brk.oth/brk.cd*100)}% of everything billed during the payment break, so the bills in that period were much larger than the usual ₹26,000 to ₹45,000.`,
+     `The ledger does not say what these charges are. Apart from ₹6,000 in August 2024, they stop after July 2018.`]},
+ {t:'Paying only the current bill since August 2018',a:L(principal),s:'unpaid billed charges today',
+  p:[`From August 2018 to April 2025 the monthly payment matched the current bill almost to the rupee (${L(P(4).coll)} paid on ${L(P(4).cd)} billed). That kept the unpaid base near ${L(R[idx('2018-12')].prin)} to ${L(R[idx('2024-12')].prin)}, but never reduced it.`,
+     `In those 81 months the balance went from ${L(P(4).start,1)} to ${L(P(4).end,1)}. Interest was ${L(P(4).int,1)} of that.`]},
+ {t:'Tariff rise and irregular meter readings, 2025 to 2026',a:'+'+L(taxExtra),s:'extra billed since May 2025, before interest',
+  p:[`In May 2025 the sanitary and borewell charges each rose from ₹12,000 to ₹15,600 (120 flats at ₹100, now ₹130). The usual monthly bill went from ₹25,176 to ₹35,200. Water moved from ₹22 to ₹25 per kilolitre by October 2025.`,
+     `Readings are lumpy. The meter recorded ${cons2025} kL in all of 2025, then ${springSpike.toLocaleString('en-IN')} kL in April and May 2026 alone, producing bills of ₹85,285 and ₹73,495. No payment was recorded in August, September or October 2026 after ₹2.9 L in July.`]}
+].map((f,i)=>`<div class="factor"><div class="rk">${i+1}</div><div><h3>${f.t}</h3>${f.p.map(x=>`<p>${x}</p>`).join('')}</div><div class="amt num">${f.a}<small>${f.s}</small></div></div>`).join('');
+
+/* ---------- phases ---------- */
+const pText={
+ 1:p=>`Billed ${L(p.cd)}, paid ${L(p.coll)}. The balance stays within a few thousand rupees of zero.`,
+ 2:p=>`Billed ${L(p.cd)}, paid ${L(p.coll)}. ${p.zero} months with no payment. Other charges add ${L(p.oth)}.`,
+ 3:p=>`Paid ${L(p.coll)} against ${L(p.cd)} billed, including ₹2.35 L on 7 Feb 2018. About ${L(p.start-p.end,1)} of the break was recovered.`,
+ 4:p=>`Paid ${L(p.coll)} against ${L(p.cd)} billed. Interest of ${L(p.int,1)} accumulates on a base that never shrinks.`,
+ 5:p=>`Billed ${L(p.cd)}, paid ${L(p.coll)}. Higher tariff and ${p.zero} months with no payment. Interest ${L(p.int,1)}.`};
+document.getElementById('phases').innerHTML=phasesDef.map(p=>`<div class="ph"><div class="n"><b>${p.id}</b>${p.name}</div>
+  <div class="when">${lab(p.a)} to ${lab(p.b)} · ${p.n} months</div><p>${pText[p.id](p)}</p>
+  <div class="bal">${p.start<0?'₹0':L(p.start,2)} → ${L(p.end,2)}</div></div>`).join('');
+
+/* ---------- tooltip ---------- */
+const tip=document.getElementById('tip');
+function showTip(html,x,y){tip.innerHTML=html;tip.style.opacity=1;const w=tip.offsetWidth,h=tip.offsetHeight;
+  let l=x+14,t=y-h-10;if(l+w>innerWidth-8)l=x-w-14;if(l<8)l=8;if(t<8)t=y+16;tip.style.left=l+'px';tip.style.top=t+'px';}
+function hideTip(){tip.style.opacity=0}
+const trow=(c,n,v)=>`<div class="r"><span>${c?`<i class="sw" style="background:${c}"></i>`:''}${n}</span><span>${v}</span></div>`;
+
+/* ---------- chart engine ---------- */
+function niceTicks(lo,hi,n=5){const span=hi-lo||1;const raw=span/n;const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+  const f=raw/mag;const step=(f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*mag;const a=Math.floor(lo/step)*step,b=Math.ceil(hi/step)*step;const t=[];for(let v=a;v<=b+1e-9;v+=step)t.push(Math.round(v*1e6)/1e6);return t}
+const charts=[];
+function chart(el,cfg){
+  const draw=()=>{
+    const w=Math.max(280,el.clientWidth);const narrow=w<520;const h=cfg.height?(narrow?cfg.height*0.82:cfg.height):300;
+    const ml=narrow?40:48,mr=cfg.endLabels&&!narrow?cfg.endLabels:12,mt=cfg.bands?24:12,mb=26;
+    const n=cfg.labels.length;const iw=w-ml-mr,ih=h-mt-mb;
+    const bar=cfg.type==='columns';
+    const X=i=>bar?ml+(i+.5)*iw/n:ml+i*iw/(n-1);
+    let lo=0,hi=0,layers=null;
+    if(cfg.type==='stack'){layers=[];let base=new Array(n).fill(0);cfg.series.forEach(s=>{const top=s.vals.map((v,i)=>base[i]+v);layers.push({s,base:base.slice(),top});base=top});hi=Math.max(...base)}
+    else{cfg.series.forEach(s=>s.vals.forEach(v=>{if(v>hi)hi=v;if(v<lo)lo=v}))}
+    if(cfg.yMax!=null)hi=cfg.yMax;if(cfg.yMin!=null)lo=cfg.yMin;
+    const ticks=niceTicks(lo,hi,narrow?4:5);lo=Math.min(lo,ticks[0]);hi=Math.max(hi,ticks[ticks.length-1]);
+    const Y=v=>mt+ih-(v-lo)/(hi-lo)*ih;
+    let s=`<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="${esc(cfg.aria||'')}">`;
+    if(cfg.bands)cfg.bands.forEach(b=>{const x0=bar?ml+b.from*iw/n:Math.max(ml,X(b.from-.5)),x1=bar?ml+(b.to+1)*iw/n:Math.min(w-mr,X(b.to+.5));
+      if(b.shade!==false)s+=`<rect class="band" x="${x0}" y="${mt}" width="${x1-x0}" height="${ih}"/>`;
+      s+=`<text class="bandlab" x="${(x0+x1)/2}" y="${mt-9}" text-anchor="middle">${b.label}</text>`;});
+    ticks.forEach(t=>{s+=`<line class="gl" x1="${ml}" x2="${w-mr}" y1="${Y(t)}" y2="${Y(t)}"/><text x="${ml-8}" y="${Y(t)+4}" text-anchor="end">${cfg.yFmt(t)}</text>`});
+    // x ticks: every January (and first)
+    cfg.labels.forEach((lb,i)=>{if(cfg.xTick){const t=cfg.xTick(i);if(t)s+=`<text x="${X(i)}" y="${h-6}" text-anchor="middle">${t}</text>`;return}const m=cfg.months[i];if(m.endsWith('-01')&&(!narrow||(+m.slice(0,4))%2===1||i===0)){s+=`<text x="${X(i)}" y="${h-6}" text-anchor="middle">${m.slice(0,4)}</text>`}});
+    if(lo<0)s+=`<line class="ax" x1="${ml}" x2="${w-mr}" y1="${Y(0)}" y2="${Y(0)}"/>`;
+    if(cfg.type==='stack'){layers.forEach(l=>{let d='';l.top.forEach((v,i)=>d+=(i?'L':'M')+X(i)+' '+Y(v));for(let i=n-1;i>=0;i--)d+='L'+X(i)+' '+Y(l.base[i]);
+      s+=`<path d="${d}Z" style="fill:${l.s.color};fill-opacity:.92;stroke:var(--surface);stroke-width:1.5" stroke-linejoin="round"/>`})}
+    if(cfg.type==='lines'){cfg.series.forEach(se=>{let d='';se.vals.forEach((v,i)=>d+=(i?'L':'M')+X(i)+' '+Y(v));
+      if(se.area)s+=`<path d="${d}L${X(n-1)} ${Y(0)}L${X(0)} ${Y(0)}Z" style="fill:${se.color};fill-opacity:.10"/>`;
+      s+=`<path d="${d}" style="fill:none;stroke:${se.color};stroke-width:2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      const e=se.vals.length-1;s+=`<circle cx="${X(e)}" cy="${Y(se.vals[e])}" r="4" style="fill:${se.color};stroke:var(--surface);stroke-width:2"/>`;
+      if(cfg.endLabels&&!narrow)s+=`<text x="${X(e)+10}" y="${Y(se.vals[e])+4}" style="fill:var(--ink2);font-weight:500">${se.endText||''}</text>`;})}
+    if(bar){const bw=Math.min(24,Math.max(1.2,iw/n*.72));cfg.series.forEach(se=>se.vals.forEach((v,i)=>{if(!v)return;const y0=Y(0),y1=Y(v);
+      const col=se.colorFn?se.colorFn(v,i):se.color;const top=Math.min(y0,y1),hh=Math.max(1,Math.abs(y1-y0));
+      s+=`<rect x="${X(i)-bw/2}" y="${top}" width="${bw}" height="${hh}" rx="${bw>5?2:.6}" style="fill:${col}"/>`;}))}
+    if(cfg.notes)cfg.notes.forEach(nt=>{const x=X(nt.i),y=Y(nt.v);const right=x>ml+iw*.62;const anchor=nt.anchor||(right?'end':'start');const tx=anchor==='end'?x-6:x+6;
+      if(nt.to!=null){s+=`<line class="gl" style="stroke:var(--ink3)" x1="${x}" x2="${x}" y1="${y}" y2="${Y(nt.to)}"/>`;
+        (nt.text.split('|')).forEach((ln,k,arr)=>{s+=`<text class="note" x="${tx}" y="${y-4-(arr.length-1-k)*13}" text-anchor="${anchor}">${esc(ln)}</text>`});}
+      else{s+=`<line class="gl" style="stroke:var(--ink3)" x1="${x}" x2="${x}" y1="${y}" y2="${y+(nt.dy||0)}"/>`;
+      (nt.text.split('|')).forEach((ln,k)=>{s+=`<text class="note" x="${tx}" y="${y+(nt.dy||0)+(nt.dy>0?12:-4)+k*13}" text-anchor="${anchor}">${esc(ln)}</text>`});}});
+    s+=`<line class="xh" id="xh" x1="0" x2="0" y1="${mt}" y2="${mt+ih}" style="display:none"/><g id="dots"></g>`;
+    s+=`<rect class="hit" x="${ml}" y="${mt}" width="${iw}" height="${ih}"/></svg>`;
+    el.innerHTML=s;
+    const svg=el.querySelector('svg'),xh=svg.querySelector('#xh'),dots=svg.querySelector('#dots'),hit=svg.querySelector('.hit');
+    const move=ev=>{const r=svg.getBoundingClientRect();const px=(ev.clientX-r.left)*(w/r.width);
+      let i=bar?Math.floor((px-ml)/(iw/n)):Math.round((px-ml)/iw*(n-1));i=Math.max(0,Math.min(n-1,i));
+      xh.style.display='';xh.setAttribute('x1',X(i));xh.setAttribute('x2',X(i));
+      let dd='';if(cfg.type!=='columns'){const sv=cfg.type==='stack'?layers.map(l=>[l.top[i],l.s.color]):cfg.series.map(se=>[se.vals[i],se.color]);
+        sv.forEach(([v,c])=>dd+=`<circle cx="${X(i)}" cy="${Y(v)}" r="4" style="fill:${c};stroke:var(--surface);stroke-width:2"/>`)}
+      dots.innerHTML=dd;showTip(cfg.tip(i),ev.clientX,ev.clientY)};
+    hit.addEventListener('pointermove',move);hit.addEventListener('pointerdown',move);
+    hit.addEventListener('pointerleave',()=>{xh.style.display='none';dots.innerHTML='';hideTip()});
+  };
+  draw();let lw=el.clientWidth;
+  new ResizeObserver(()=>{if(Math.abs(el.clientWidth-lw)>2){lw=el.clientWidth;draw()}}).observe(el);
+  charts.push(draw);
+}
+const months=R.map(r=>r.m), labels=R.map(r=>r.label);
+const ph=(a,b,label)=>({from:idx(a),to:idx(b),label});
+
+/* 1. balance split */
+chart(document.getElementById('c-balance'),{type:'stack',height:340,labels,months,
+  aria:'Stacked area of the outstanding balance, unpaid billed charges and accumulated interest, 2015 to 2026',
+  series:[{name:'Unpaid billed charges',color:'var(--blue)',vals:R.map(r=>Math.max(0,r.prin))},{name:'Accumulated interest',color:'var(--orange)',vals:R.map(r=>Math.max(0,r.close-Math.max(0,r.prin)))}],
+  yFmt:axL,yMax:3000000,bands:phasesDef.map(p=>({from:p.i0,to:p.i1,label:String(p.id),shade:p.id%2===0})),
+  tip:i=>{const r=R[i];return `<b>${r.label}</b>`+trow('var(--blue)','Unpaid charges',inr(Math.max(0,r.prin)))+trow('var(--orange)','Interest',inr(r.close-Math.max(0,r.prin)))+trow('','Balance',inr(r.close))+trow('','Paid this month',inr(r.coll))},
+  notes:[{i:idx('2018-01'),v:R[idx('2018-01')].close,text:`${lab('2018-01')}|${L(R[idx('2018-01')].close,2)}`,dy:-26},{i:N-1,v:LAST.close,text:`${LAST.label} · ${L(LAST.close,2)}`,dy:-10}]});
+// recolor on theme changes
+
+/* 2. waterfall */
+(function(){const rows=[
+ ['Balance on 1 Jan 2015',OPEN,'var(--ink3)'],
+ ['Sanitary, borewell, meter',T.fixed,'var(--blue)'],
+ ['Water usage',T.water,'var(--aqua)'],
+ ['Other charge',T.other,'var(--yellow)'],
+ ['Interest and adjustments',T.interest,'var(--orange)'],
+ ['Payments received',-T.coll,'var(--green)'],
+ ['Write-off',-T.wo,'var(--ink3)']];
+ let cum=0,max=0;rows.forEach(r=>{cum+=r[1];max=Math.max(max,cum,cum-r[1])});
+ let html='';cum=0;
+ rows.forEach(([n,v,c])=>{const a=cum,b=cum+v;cum=b;const lo=Math.min(a,b),w=Math.abs(v);
+   html+=`<div class="wf-row"><span class="name">${n}</span><div class="wf-track"><div class="wf-bar" style="left:${lo/max*100}%;width:${Math.max(.4,w/max*100)}%;background:${c}"></div></div><span class="val">${v<0?'−':'+'}${Lnum(Math.abs(v))} L</span></div>`});
+ html+=`<div class="wf-row total sep"><span class="name">Outstanding, ${LAST.label}</span><div class="wf-track"><div class="wf-bar" style="left:0;width:${cum/max*100}%;background:var(--ink)"></div></div><span class="val">${Lnum(cum)} L</span></div>`;
+ document.getElementById('waterfall').innerHTML=html;
+ if(Math.abs(cum-LAST.close)>1)console.warn('waterfall mismatch',cum,LAST.close);
+})();
+
+/* 3. payment gap */
+chart(document.getElementById('c-gap'),{type:'columns',height:280,labels,months,yFmt:axL,
+  aria:'Monthly difference between payment and current charges',
+  bands:[ph('2016-08','2018-01','Payment break')],
+  series:[{name:'gap',vals:R.map(r=>r.gap),colorFn:v=>v>=0?'var(--pos)':'var(--neg)'}],
+  tip:i=>{const r=R[i];return `<b>${r.label}</b>`+trow('','Current charges',inr(r.cd))+trow('','Paid',inr(r.coll))+trow('','Difference',inr(r.gap))+trow('','Closing balance',inr(r.close))},
+  notes:[{i:idx('2018-02'),v:R[idx('2018-02')].gap,text:`Feb 2018: ₹2.35 L|part-payment on 7 Feb`,dy:-4},{i:idx('2017-11'),v:R[idx('2017-11')].gap,text:`Nov 2017: ₹73,475|"Other charge"`,dy:8},{i:idx('2026-07'),v:R[idx('2026-07')].gap,text:`Jul 2026: ₹2.9 L paid`,dy:-4}]});
+
+/* 4. interest vs charges */
+const i0=idx('2018-08');
+chart(document.getElementById('c-int'),{type:'lines',height:300,labels:labels.slice(i0),months:months.slice(i0),yFmt:axK,endLabels:0,
+  aria:'Monthly interest added versus monthly current charges',
+  series:[{name:'Current charges',color:'var(--blue)',vals:R.slice(i0).map(r=>r.cd)},{name:'Interest',color:'var(--orange)',vals:R.slice(i0).map(r=>Math.max(0,r.intAdj))}],
+  tip:i=>{const r=R[i0+i];return `<b>${r.label}</b>`+trow('var(--orange)','Interest added',inr(r.intAdj))+trow('var(--blue)','Current charges',inr(r.cd))+trow('','Paid',inr(r.coll))}});
+
+/* annual stacked bars */
+(function(){const yrs=[...new Set(R.map(r=>r.m.slice(0,4)))];
+ const data=yrs.map(y=>{const s=R.filter(r=>r.m.startsWith(y));return{y,fixed:sum(s,r=>r.fixed),w:Math.max(0,sum(s,r=>r.w)),o:Math.max(0,sum(s,r=>r.oth)),i:Math.max(0,sum(s,r=>r.intAdj)),n:s.length}});
+ const mx=Math.max(...data.map(d=>d.fixed+d.w+d.o+d.i));
+ const segs=[['fixed','Sanitary, borewell, meter','var(--blue)'],['w','Water usage','var(--aqua)'],['o','Other charge','var(--yellow)'],['i','Interest','var(--orange)']];
+ const el=document.getElementById('annual');
+ el.innerHTML=data.map(d=>`<div class="hb-row" data-y="${d.y}"><span class="y">${d.y}</span><div class="hb-stack" style="width:${(d.fixed+d.w+d.o+d.i)/mx*100}%">${segs.map(([k,,c])=>`<i data-k="${k}" style="background:${c};flex:${d[k]} 1 0"></i>`).join('')}</div><span class="t">${Lnum(d.fixed+d.w+d.o+d.i)} L</span></div>`).join('');
+ el.addEventListener('pointermove',e=>{const seg=e.target.closest('.hb-stack i');const row=e.target.closest('.hb-row');if(!row){hideTip();return}
+   const d=data.find(x=>x.y===row.dataset.y);let h=`<b>${d.y}${d.n<12?` (${d.n} months)`:''}</b>`+segs.map(([k,n,c])=>trow(c,n,inr(d[k]))).join('');showTip(h,e.clientX,e.clientY)});
+ el.addEventListener('pointerleave',hideTip);
+})();
+
+/* 5. consumption */
+chart(document.getElementById('c-cons'),{type:'columns',height:260,labels,months,yFmt:v=>v===0?'0':v.toLocaleString('en-IN'),
+  aria:'Metered consumption in kilolitres per month',
+  series:[{name:'kL',vals:R.map(r=>r.cons),color:'var(--blue)'}],
+  tip:i=>{const r=R[i];return `<b>${r.label}</b>`+trow('','Consumption',r.cons.toLocaleString('en-IN')+' kL')+trow('','Water charge',inr(r.w))+(r.m==='2024-07'?'<div style="margin-top:4px;opacity:.8">Estimated (SMS) reading, reversed in Aug 2024</div>':'')},
+  notes:[{i:idx('2024-04'),v:R[idx('2024-04')].cons,text:`Mar to Apr 2024: ${sp24.toLocaleString('en-IN')} kL`,dy:6},{i:idx('2026-04'),v:R[idx('2026-04')].cons,text:`Apr to May 2026: ${springSpike.toLocaleString('en-IN')} kL`,dy:6},{i:idx('2025-01'),v:600,to:40,anchor:'start',text:`2025: ${cons2025} kL|in the whole year`}]});
+
+/* ---------- calculator ---------- */
+const $=id=>document.getElementById(id);
+function simulate(B0,lump,pay,cd,r,n){let b=Math.max(0,B0-lump),intSum=0,paid=lump,clear=null;const path=[b];
+  for(let k=1;k<=n;k++){const it=b*r;intSum+=it;b=b+it+cd-pay;paid+=pay;if(b<=0){b=0;if(clear==null)clear=k;path.push(0);for(let j=k+1;j<=n;j++)path.push(0);break}path.push(b)}
+  while(path.length<n+1)path.push(path[path.length-1]);return{path,intSum,paid,clear,end:path[n]}}
+const presets=[['Current bill only',{lump:0,pay:cd_now}],['₹75,000 a month',{lump:0,pay:75000}],['₹1,00,000 a month',{lump:0,pay:100000}],['₹10 lakh now + current bill',{lump:1000000,pay:cd_now}]];
+$('presets').innerHTML=presets.map((p,i)=>`<button type="button" data-i="${i}">${p[0]}</button>`).join('');
+$('in-pay').value=100000;
+let projDraw=null;
+function calc(){const lump=+$('in-lump').value||0,pay=+$('in-pay').value||0,cd=+$('in-cd').value||0,r=(+$('in-rate').value||0)/100,n=Math.max(6,Math.min(180,Math.round(+$('in-n').value||60)));
+  const base=simulate(LAST.close,0,cd,cd,r,n),sc=simulate(LAST.close,lump,pay,cd,r,n);
+  $('calc-out').innerHTML=[['Balance after '+n+' months',inr(sc.end),'Pay only current: '+inr(base.end)],
+    ['Cleared in',sc.clear?(Math.floor(sc.clear/12)?Math.floor(sc.clear/12)+' yr ':'')+(sc.clear%12)+' mo':'Not within '+n+' mo',''],
+    ['Interest over the period',inr(sc.intSum),'Pay only current: '+inr(base.intSum)]].map(([l,v,d])=>`<div><div class="l">${l}</div><div class="v num">${v}</div><div class="l num">${d}</div></div>`).join('');
+  $('calc-warn').textContent=`Starting balance ${inr(LAST.close)} (${LAST.label} ledger). ${pay<LAST.close/60+cd?`Monthly payments below ${inr(LAST.close/60+cd)} do not stop the balance rising at today's balance. `:''}This estimate applies the rate seen in the ledger; BWSSB's own working can differ, so confirm any figure with the sub-division before paying.`;
+  const lbls=base.path.map((_,k)=>'Month '+k),mon=base.path.map((_,k)=>String(2026+Math.floor((9+k)/12))+'-'+String(((9+k)%12)+1).padStart(2,'0'));
+  const mk=()=>chart($('c-proj'),{type:'lines',height:280,labels:lbls,months:mon.map((m,i)=>i%12===3?m.slice(0,4)+'-01':m),yFmt:axL,
+    aria:'Projected balance',series:[{name:'base',color:'var(--orange)',vals:base.path},{name:'sc',color:'var(--blue)',vals:sc.path}],
+    tip:i=>{const d=new Date(2026,9+i,1);return `<b>${MN[d.getMonth()]} ${d.getFullYear()}</b>`+trow('var(--orange)','Current bill only',inr(base.path[i]))+trow('var(--blue)','Your scenario',inr(sc.path[i]))}});
+  $('c-proj').replaceWith($('c-proj').cloneNode(false));mk();}
+presets.forEach(()=>{});
+$('presets').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const p=presets[+b.dataset.i][1];$('in-lump').value=p.lump;$('in-pay').value=p.pay;[...$('presets').children].forEach(x=>x.classList.toggle('on',x===b));calc()});
+['in-lump','in-pay','in-cd','in-rate','in-n'].forEach(id=>$(id).addEventListener('input',()=>{[...$('presets').children].forEach(x=>x.classList.remove('on'));calc()}));
+[...$('presets').children][2].classList.add('on');
+calc();
+
+/* ---------- to-do list ---------- */
+$('todo').innerHTML=[
+ `Request an itemised statement for every "Other Charge" entry from August 2016 to July 2018 (${L(otherWin)}), starting with ₹73,475 in November 2017 and ₹33,086 in March 2017. The ledger gives no reason for them.`,
+ `Ask for the interest working. The ledger shows one sixtieth of arrears each month. Ask whether a one-time settlement or interest waiver for old dues is available and what the figure would be.`,
+ `Check two receipts that were not netted in the next bill's arrears: ₹70,600 paid 1 Oct 2016 (arrears rose from ₹17,313 to ₹87,164) and ₹35,500 paid 2 Mar 2018. Interest was charged on money already paid.`,
+ `Ask for a meter test and a field reading for meter 165f034715. Readings of 1 to 27 kL a month for 120 flats through 2025, then 2,433 kL in two months, point to missed or estimated reads. The July 2024 "SMS" estimate was already reversed once.`,
+ `Confirm the notified basis of the ₹15,600 sanitary and borewell charges and the ₹25 per kL rate that began in 2025, and that the flat count of 120 matches the connection record.`,
+ `Set a standing payment above the break-even level of ${inr(breakEven)} a month if the balance is to be cleared on the current terms. Use the calculator above for the timeline.`].map(t=>`<li><span>${t}</span></li>`).join('');
+
+/* ---------- table ---------- */
+const hdr=['Month','kL','Arrears + interest','Interest','Water','Fixed','Other','Current','Total demand','Paid','Closing'];
+$('tbl').querySelector('thead').innerHTML='<tr>'+hdr.map(h=>`<th>${h}</th>`).join('')+'</tr>';
+const sel=$('f-sel');sel.innerHTML='<option value="all">All 142 months</option>'+phasesDef.map(p=>`<option value="${p.id}">${p.id}. ${p.name}</option>`).join('');
+let zeroOnly=false;
+const fmt=n=>Math.round(n).toLocaleString('en-IN');
+function renderTable(){const q=$('f-q').value.trim().toLowerCase(),pid=sel.value;
+  const rows=R.filter(r=>(pid==='all'||(r.i>=P(+pid).i0&&r.i<=P(+pid).i1))&&(!q||r.label.toLowerCase().includes(q))&&(!zeroOnly||r.coll===0));
+  $('tbl').querySelector('tbody').innerHTML=rows.slice().reverse().map(r=>`<tr class="${r.coll===0?'zero':''}"><td>${r.label}</td><td>${fmt(r.cons)}</td><td>${fmt(r.ai)}</td><td>${fmt(r.int)}</td><td class="${r.w<0?'neg':''}">${fmt(r.w)}</td><td>${fmt(r.fixed)}</td><td>${fmt(r.oth)}</td><td>${fmt(r.cd)}</td><td>${fmt(r.tot)}</td><td>${fmt(r.coll)}</td><td>${fmt(r.close)}</td></tr>`).join('');
+  $('f-count').textContent=rows.length+' rows, newest first'}
+sel.addEventListener('change',renderTable);$('f-q').addEventListener('input',renderTable);
+$('f-zero').addEventListener('click',e=>{zeroOnly=!zeroOnly;e.currentTarget.classList.toggle('on',zeroOnly);e.currentTarget.setAttribute('aria-pressed',zeroOnly);renderTable()});
+$('f-copy').addEventListener('click',async e=>{const csv=['month,'+COLS.slice(1).join(',')].concat(R.map(r=>r.m+','+COLS.slice(1).map(k=>r[k]).join(','))).join('\n');
+  try{await navigator.clipboard.writeText(csv);e.target.textContent='Copied'}catch(_){const ta=document.createElement('textarea');ta.value=csv;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');e.target.textContent='Copied'}catch(__){e.target.textContent='Copy blocked'}ta.remove()}
+  setTimeout(()=>e.target.textContent='Copy as CSV',1600)});
+renderTable();
+
+/* ---------- tabs ---------- */
+const tabBtns=[...document.querySelectorAll('.tabs [role=tab]')];
+function showTab(id,focus){tabBtns.forEach(b=>{const on=b.dataset.tab===id;b.setAttribute('aria-selected',on?'true':'false');b.tabIndex=on?0:-1;document.getElementById('tab-'+b.dataset.tab).hidden=!on;if(on&&focus)b.focus()});
+  hideTip();try{history.replaceState(null,'',id==='overview'?location.pathname+location.search:'#'+id)}catch(_){}}
+tabBtns.forEach(b=>{b.addEventListener('click',()=>showTab(b.dataset.tab));
+  b.addEventListener('keydown',e=>{if(e.key==='ArrowRight'||e.key==='ArrowLeft'){const i=tabBtns.indexOf(b),n=tabBtns[(i+(e.key==='ArrowRight'?1:tabBtns.length-1))%tabBtns.length];showTab(n.dataset.tab,true)}})});
+if(location.hash==='#interest')showTab('interest');
+
+/* ---------- interest analysis tab ---------- */
+function simModel(rate,o={}){const from=o.from||'2016-08',cdf=o.cdf||(r=>r.cd),cf=o.cf||(r=>r.coll);let b=R[idx(from)-1].close;
+  for(const r of R.slice(idx(from))){let c=cf(r);if(o.lump&&r.m===o.lump[0])c+=o.lump[1];b=b+Math.max(b,0)*rate+cdf(r)-c}return b}
+function balBefore(month,rate){let b=R[idx('2016-08')-1].close;for(const r of R.slice(idx('2016-08'),idx(month)))b=b+Math.max(b,0)*rate+r.cd-r.coll;return b+Math.max(b,0)*rate}
+let lo_=0.005,hi_=0.0167;for(let k=0;k<70;k++){const mid=(lo_+hi_)/2;if(simModel(mid)>LAST.close)hi_=mid;else lo_=mid}
+const Reff=(lo_+hi_)/2, annualEff=Math.pow(1+Reff,12)-1, doubleYrs=Math.log(2)/Math.log(1+Reff)/12;
+let sAcc=0;R.forEach(r=>{sAcc+=Math.max(0,r.prin)*Reff;r.simple=r.cumInt>0?Math.min(r.cumInt,sAcc):0;r.ioi=Math.max(0,r.cumInt-r.simple)});
+const ioiT=LAST.ioi, simT=LAST.simple, ioiShare=ioiT/LAST.cumInt;
+const crossR=R.find(r=>r.m>'2018-01'&&r.cumInt>r.prin);
+const pAfter=R.slice(idx('2018-08'),idx('2026-04')).map(r=>r.prin), pMin=Math.min(...pAfter), pMax=Math.max(...pAfter);
+const monthsSince=N-idx('2018-08'), growth=Math.pow(1+Reff,monthsSince);
+
+$('i-intro').innerHTML=`Interest is ${Math.round(interestShare*100)}% of the ${L(LAST.close)} balance. This tab shows how it built up, why the growth speeds up, and which factors changed the outcome most. Where the page says "model", it uses a simple monthly-interest model fitted to the ledger at ${(Reff*100).toFixed(2)}% a month, which reproduces the real balance exactly.`;
+$('i-tiles').innerHTML=[
+ ['Interest charged to date',L(T.interest),`${Math.round(interestShare*100)}% of the balance`],
+ ['Interest on earlier interest',L(ioiT),`${Math.round(ioiShare*100)}% of all interest`],
+ ['Effective rate',`${(Reff*100).toFixed(2)}% a month`,`${(annualEff*100).toFixed(1)}% a year, doubles in ${doubleYrs.toFixed(1)} years`],
+ ['Interest per ₹1 unpaid',`₹${(LAST.cumInt/LAST.prin).toFixed(2)}`,`Interest passed unpaid charges in ${lab(crossR.m)}`]
+].map(([l,v,d])=>`<div class="tile"><div class="l">${l}</div><div class="v num">${v}</div><div class="d">${d}</div></div>`).join('');
+
+chart($('c-snow'),{type:'stack',height:340,labels,months,yFmt:axL,yMax:3000000,
+  aria:'Stacked area of the balance split into unpaid charges, interest on unpaid charges and interest on earlier interest',
+  series:[{name:'Unpaid billed charges',color:'var(--blue)',vals:R.map(r=>Math.max(0,r.prin))},
+          {name:'Interest on unpaid charges',color:'var(--orange)',vals:R.map(r=>r.simple)},
+          {name:'Interest on earlier interest',color:'var(--mag)',vals:R.map(r=>r.ioi)}],
+  tip:i=>{const r=R[i];return `<b>${r.label}</b>`+trow('var(--blue)','Unpaid charges',inr(Math.max(0,r.prin)))+trow('var(--orange)','Interest on charges',inr(r.simple))+trow('var(--mag)','Interest on interest',inr(r.ioi))+trow('','Balance',inr(r.close))},
+  notes:[{i:crossR.i,v:crossR.close,text:`${lab(crossR.m)}|interest passes unpaid charges`,dy:-30},{i:N-1,v:LAST.close,text:`${LAST.label} · ${L(LAST.close)}`,dy:-10}]});
+$('i-snow-d').innerHTML=`From August 2018 to March 2026 the unpaid charges (blue) barely moved, staying between <b>${L(pMin)}</b> and <b>${L(pMax)}</b>. Interest on those charges (orange) climbs at a steady pace. Interest charged on earlier interest (magenta) starts small, curves upward, and is now the largest layer at <b>${L(ioiT)}</b> of ${L(LAST.cumInt)}. Cumulative interest passed the unpaid charges in ${lab(crossR.m)}. Today each ₹1 of unpaid charges carries ₹${(LAST.cumInt/LAST.prin).toFixed(2)} of interest.`;
+
+/* yearly */
+const yrs=[...new Set(R.map(r=>r.m.slice(0,4)))].filter(y=>y>='2016');
+const yd=yrs.map(y=>{const s=R.filter(r=>r.m.startsWith(y)),e=s[s.length-1],p0=R[idx(y+'-01')-1]||{simple:0,ioi:0,close:OPEN};
+  return{y,n:s.length,simple:Math.max(0,e.simple-(p0.simple||0)),ioi:Math.max(0,e.ioi-(p0.ioi||0)),open:p0.close,close:e.close,cd:sum(s,r=>r.cd),coll:sum(s,r=>r.coll),int:sum(s,r=>r.intAdj)}});
+const ymax=Math.max(...yd.map(d=>d.simple+d.ioi));
+$('i-years').innerHTML=yd.map(d=>`<div class="hb-row" data-y="${d.y}"><span class="y">${d.y}</span><div class="hb-stack" style="width:${(d.simple+d.ioi)/ymax*100}%"><i style="background:var(--orange);flex:${d.simple} 1 0"></i><i style="background:var(--mag);flex:${d.ioi} 1 0"></i></div><span class="t">${Lnum(d.simple+d.ioi)} L</span></div>`).join('');
+$('i-years').addEventListener('pointermove',e=>{const row=e.target.closest('.hb-row');if(!row){hideTip();return}const d=yd.find(x=>x.y===row.dataset.y);
+  showTip(`<b>${d.y}${d.n<12?` (${d.n} months)`:''}</b>`+trow('var(--orange)','On unpaid charges',inr(d.simple))+trow('var(--mag)','On earlier interest',inr(d.ioi)),e.clientX,e.clientY)});
+$('i-years').addEventListener('pointerleave',hideTip);
+const y19=yd.find(d=>d.y==='2019'),y25=yd.find(d=>d.y==='2025');
+const cdSpan=yd.filter(d=>d.y>='2019'&&d.y<='2025').map(d=>d.cd);
+$('i-years-d').innerHTML=`Interest added went from <b>${L(y19.int)}</b> in 2019 to <b>${L(y25.int)}</b> in 2025, while the service bills for each of those years stayed between ${L(Math.min(...cdSpan))} and ${L(Math.max(...cdSpan))}. 2026 covers January to October only. In the table, the last column shows how much of the year's rise in the balance came from interest. It is blank for 2018 because the ₹2.35 lakh part-payment in February 2018 brought the balance down that year.`;
+$('i-ytbl').innerHTML='<thead><tr>'+['Year','Balance at start','Billed for service','Paid','Interest added','Balance at end','Interest share of rise'].map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>'+
+ yd.filter(d=>d.y>='2018').map(d=>{const rise=d.close-d.open;return `<tr><td>${d.y}${d.n<12?'*':''}</td><td>${fmt(d.open)}</td><td>${fmt(d.cd)}</td><td>${fmt(d.coll)}</td><td>${fmt(d.int)}</td><td>${fmt(d.close)}</td><td>${rise>0&&d.int/rise<=1.005?Math.round(d.int/rise*100)+'%':'-'}</td></tr>`}).join('')+'</tbody>';
+
+/* worked example */
+const exM=['2018-09','2018-10','2018-11','2018-12'];
+$('i-ex').innerHTML='<thead><tr>'+['Month','Bill Arrear','Arrear ÷ 60','Interest in ledger','Closing balance',"Next month's Bill Arrear"].map(h=>`<th>${h}</th>`).join('')+'</tr></thead><tbody>'+
+ exM.map(m=>{const r=R[idx(m)],nx=R[r.i+1];return `<tr><td>${r.label}</td><td>${fmt(r.ar)}</td><td>${fmt(r.ar/60)}</td><td>${fmt(r.int)}</td><td>${fmt(r.close)}</td><td>${fmt(nx.ar)}</td></tr>`}).join('')+'</tbody>';
+$('i-ex-d').innerHTML=`In every row the ledger's interest equals the Bill Arrear divided by 60, and next month's Bill Arrear equals this month's closing balance. At that pace, unpaid money grows by 1.667% a month, or 21.9% a year with monthly compounding. In some stretches the ledger holds interest back for a few months (July 2017 to February 2018, and from October 2025), so the effective rate over the whole period is a little lower at ${(Reff*100).toFixed(2)}% a month.`;
+
+/* scenarios */
+const need18=balBefore('2018-08',Reff),need19=balBefore('2019-08',Reff),need22=balBefore('2022-08',Reff);
+const scn=[
+ {n:'Interest rate halved',ds:`Same bills and payments at ${(Reff*50).toFixed(2)}% a month`,v:simModel(Reff/2)},
+ {n:'Simple interest only',ds:'Interest charged on unpaid charges, never on earlier interest',v:LAST.prin+sAcc},
+ {n:'No "Other Charge" billed',ds:'Same payments, without the '+L(T.other)+' of Other Charge',v:simModel(Reff,{cdf:r=>r.cd-Math.max(0,r.oth)})},
+ {n:'Every bill paid in full to Jul 2018',ds:'No arrears during the payment break',v:simModel(Reff,{cf:r=>(r.m>='2016-08'&&r.m<='2018-07')?r.cd:r.coll})},
+ {n:'Whole balance cleared in Aug 2018',ds:`One payment of ${L(need18)}`,v:simModel(Reff,{lump:['2018-08',need18]})},
+ {n:'Whole balance cleared in Aug 2019',ds:`One payment of ${L(need19)}`,v:simModel(Reff,{lump:['2019-08',need19]})},
+ {n:'Whole balance cleared in Aug 2022',ds:`One payment of ${L(need22)}`,v:simModel(Reff,{lump:['2022-08',need22]})},
+ {n:'No tariff rise from May 2025',ds:'Sanitary and borewell kept at ₹12,000 each',v:simModel(Reff,{cdf:r=>r.cd-(r.m>='2025-05'?7200:0)})}
+].sort((a,b)=>b.v-a.v);
+const scAll=[{n:'Actual ledger balance',ds:`${LAST.label}`,v:LAST.close,act:true}].concat(scn);
+$('i-sc').innerHTML=scAll.map(x=>`<div class="sc-row"><div class="nm">${x.n}<div class="ds">${x.ds}</div></div><div class="sc-bar" role="img" aria-label="${x.n}: ${L(x.v)}"><i style="width:${Math.max(.6,x.v/LAST.close*100)}%;background:${x.act?'var(--orange)':'var(--blue)'}"></i></div><div class="vv">${L(x.v)}${x.act?'':`<small>saves ${L(LAST.close-x.v)}</small>`}</div></div>`).join('');
+const sc=n=>scn.find(x=>x.n===n).v;
+$('i-sc-d').innerHTML=`<b>Time mattered most.</b> Clearing everything in August 2018 would have taken ${L(need18)}. Waiting until August 2022 raised that to ${L(need22)}, and the same payment today would be ${L(LAST.close)}. After a clear-out, only about ${L(sc('Whole balance cleared in Aug 2018'),1)} would remain, from small shortfalls in later months. <b>Rate and compounding are one lever.</b> Halving the rate, or never charging interest on interest, each cuts the balance to about ${L(sc('Interest rate halved'),1)} to ${L(sc('Simple interest only'),1)}. <b>The 2016 to 2018 charges were the trigger.</b> With the same payments and no Other Charge, the balance today would be about ${L(sc('No "Other Charge" billed'),1)}. <b>The 2025 tariff rise is minor.</b> It accounts for ${L(LAST.close-sc('No tariff rise from May 2025'),2)} of the balance.`;
+$('i-sc-w').textContent=`Model: interest at ${(Reff*100).toFixed(2)}% a month on any positive balance, applied to the actual bills and payments from August 2016. It reproduces today's balance by construction and leaves out the ₹31,259 write-off, so treat each scenario as an estimate, not a recalculated BWSSB statement.`;
+
+/* rate sweep */
+const rates=Array.from({length:26},(_,k)=>k/1000*1), rv=rates.map(r=>simModel(r));
+chart($('c-rate'),{type:'lines',height:300,labels:rates.map(r=>(r*100).toFixed(1)+'%'),months:rates.map(()=>''),xTick:i=>i%5===0?(i/10).toFixed(1)+'%':'',yFmt:axL,
+  aria:"Today's balance under different monthly interest rates",
+  series:[{name:'Balance',color:'var(--orange)',vals:rv,area:true}],
+  tip:i=>`<b>${(i/10).toFixed(1)}% a month</b>`+trow('','Balance today',inr(rv[i]))+trow('','Interest part',inr(rv[i]-LAST.prin)),
+  notes:[{i:Reff*1000,v:LAST.close,text:`Actual: ${(Reff*100).toFixed(2)}%|${L(LAST.close,1)}`,dy:-4,anchor:'end'},{i:Reff*500,v:simModel(Reff/2),text:`Half the rate|${L(simModel(Reff/2),1)}`,dy:-4,anchor:'end'}]});
+$('i-rate-d').innerHTML=`At 0% the balance would be <b>${L(rv[0])}</b>, close to the unpaid charges alone. Each extra half point of monthly rate adds more than the last, because interest compounds: going from 1.0% to 1.5% adds ${L(simModel(.015)-simModel(.01),1)}, and going from 1.5% to 2.0% adds ${L(simModel(.02)-simModel(.015),1)}.`;
+const waitM=['2018-08','2019-08','2022-08','2026-10'], wmax=R[idx('2026-10')].tot;
+$('i-wait').innerHTML=waitM.map(m=>{const r=R[idx(m)];return `<div class="hb-row" style="grid-template-columns:70px minmax(0,1fr) 84px"><span class="y">${r.label}</span><div class="hb-stack" style="width:${r.tot/wmax*100}%"><i style="background:${m==='2026-10'?'var(--orange)':'var(--blue)'};flex:1 1 0"></i></div><span class="t">${Lnum(r.tot)} L</span></div>`}).join('');
+$('i-wait-d').innerHTML=`The bill grew from ${L(R[idx('2018-08')].tot,1)} to ${L(wmax,1)}, ${(wmax/R[idx('2018-08')].tot).toFixed(1)} times larger, while the monthly service charge stayed near ${inr(cd_now)}.`;
+
+/* three parameters */
+$('i-trio').innerHTML=[
+ ['The unpaid base',L(principal),`Billed charges that were never paid. It was ${L(R[idx('2018-07')].prin,1)} in July 2018 and ${L(principal,1)} now, so it changed little and is not what grew the balance.`],
+ ['The rate',`${(Reff*100).toFixed(2)}% a month`,`About ${(annualEff*100).toFixed(1)}% a year, compounding. The ledger shows the same one-sixtieth rule throughout, so the rate did not change over time.`],
+ ['Time',`${monthsSince} months`,`Since August 2018 the base has been left to compound. A rupee left unpaid then grows to about ₹${growth.toFixed(1)} at this rate, and the longer it runs the faster it grows.`]
+].map(([h,v,t])=>`<div class="card"><h3>${h}</h3><div class="big num">${v}</div><p>${t}</p></div>`).join('');
+
+/* ---------- notes ---------- */
+$('notes').innerHTML=[
+ 'The ledger pages were photographed at an angle. All 142 rows were transcribed by hand from the images. Each row was then checked: arrears plus interest equals arrears and interest separately, current charges equal their parts, total equals arrears plus current, and closing equals total less payment. 568 checks run, and two rows differ by amounts printed in the ledger itself: October 2016 (total demand ₹5,112 lower than its parts) and June 2020 (a ₹472 credit).',
+ 'Consumption before May 2025 comes from the ledger\'s reading column and matches the water charge at ₹22 per kL in every month except the August 2024 correction. For July 2024 the reading is an "SMS" estimate, so consumption is taken from the charge.',
+ '"Interest and adjustments" is derived: change in closing balance, less current charges billed, plus payments, plus write-off. It matches the ledger\'s interest column in normal months and also absorbs timing differences when a receipt is posted a month late. These net out over the period, and the bridge reconciles to the rupee.',
+ '"Unpaid billed charges" is the opening balance plus every current charge billed, less every payment and the one write-off (₹31,259, June 2017). Early 2015 shows small negatives from cheque-realisation timing.',
+ 'The interest rule (1.667% a month) was read off the ledger and tested against the actual balance. The test run starts at July 2018 and uses actual payments. The ledger sometimes holds interest back for a month, so the model drifts by up to a few percent.',
+ 'The interest line dips in a few months (December 2022, February 2023, March 2024). Those are months where the ledger itself shows lower or zero interest, and August 2024 is also affected by a one-off water credit in the bill.',
+ '"Other Charge" is not explained anywhere in the ledger. This analysis reports it as billed and does not assign a cause.',
+ 'Nothing here is legal or financial advice. Confirm figures with BWSSB sub-division WEST12 before paying or disputing.'].map(t=>`<li>${t}</li>`).join('');
+</script>
